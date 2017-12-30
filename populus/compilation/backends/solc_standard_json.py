@@ -1,3 +1,4 @@
+import os
 import pprint
 
 from cytoolz import (
@@ -8,6 +9,7 @@ from cytoolz import (
 )
 
 from semantic_version import (
+    Version,
     Spec,
 )
 
@@ -19,8 +21,13 @@ from eth_utils import (
 
 from solc import (
     get_solc_version,
-    compile_standard,
+    compile_standard as solc_compile_standard
 )
+
+from solcjs import (
+    compile_standard as solcjs_compile_standard
+)
+
 from solc.exceptions import (
     ContractsNotFound,
 )
@@ -110,7 +117,12 @@ class SolcStandardJSONBackend(BaseCompilerBackend):
     test_source_glob = ('Test*.sol', )
 
     def __init__(self, *args, **kwargs):
-        if get_solc_version() not in Spec('>=0.4.11'):
+        if os.getenv("PY_SOLCJS_COMPILATION_VERSION"):
+            solc_version = Version(os.getenv("PY_SOLCJS_COMPILATION_VERSION"))
+        else:
+            solc_version = get_solc_version()
+
+        if solc_version not in Spec('>=0.4.11'):
             raise OSError(
                 "The 'SolcStandardJSONBackend can only be used with solc "
                 "versions >=0.4.11.  The SolcCombinedJSONBackend should be used "
@@ -166,7 +178,10 @@ class SolcStandardJSONBackend(BaseCompilerBackend):
         self.logger.debug("Input Description JSON settings are: %s", std_input["settings"])
         self.logger.debug("Command line options are: %s", command_line_options)
         try:
-            compilation_result = compile_standard(std_input, **command_line_options)
+            if os.getenv("PY_SOLCJS_COMPILATION_VERSION"):
+                compilation_result = solcjs_compile_standard(std_input)
+            else:
+                compilation_result = solc_compile_standard(std_input, **command_line_options)
         except ContractsNotFound:
             return {}
 
